@@ -22,7 +22,7 @@ async function main() {
         DeletionLogModel.deleteMany({})
         .then(() => {
           console.log('DeletionLogModel deleted successfully');
-          generateExpiryDocuments(5000000)
+          generateExpiryDocuments(10)
         })
         .catch((error) => {
           console.error('Error deleting DeletionLogModel collection:', error);
