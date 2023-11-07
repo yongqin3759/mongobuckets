@@ -16,26 +16,31 @@ async function main() {
       logger.info('List of Collections')
       logger.info(listOfCollections)
       logger.info('------------------------------------------')
-      ExpiryModel.deleteMany({})
-      .then(() => {
-        console.log('ExpiryModel deleted successfully');
-        DeletionLogModel.deleteMany({})
-        .then(() => {
+      DeletionLogModel.deleteMany({})
+        .then(async () => {
           console.log('DeletionLogModel deleted successfully');
-          generateExpiryDocuments(10)
         })
         .catch((error) => {
           console.error('Error deleting DeletionLogModel collection:', error);
         });
+      ExpiryModel.deleteMany({})
+      .then(() => {
+        console.log('ExpiryModel deleted successfully');
+        
       })
       .catch((error) => {
         console.error('Error deleting ExpiryModel collection:', error);
-      });
+      }).finally(() => {
+        console.log('generateExpiryDocuments')
+        generateExpiryDocuments(10)
+      })
+      ;
       
     })
     .catch((error) => {
       logger.error('error connecting to MongoDB:', error.message)
     })
+    
 
 
 

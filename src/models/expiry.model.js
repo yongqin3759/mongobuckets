@@ -5,7 +5,6 @@ const expirySchema = new mongoose.Schema({
   expireAt: {
     type: Date,
     default: Date.now() + 10 * 60 * 1000,   // expires in 10 minutes
-    index: { expires: '0s' }
   },
   
 });
@@ -29,7 +28,7 @@ const minuteBucket = []
 
 const twoMinuteBucket = []
 
-const tenMinuteBucket = []
+const restBucket = []
 
 
 changeStream.on('change', async (change) => {
@@ -47,28 +46,50 @@ changeStream.on('change', async (change) => {
     await deletionLog.save();
   }
   if (change.operationType === 'insert') {
-    const deletionTime = new Date();
+    const currentTime = new Date();
     const documentId = change.documentKey._id;
-    const preImage = change.fullDocumentBeforeChange;
-    const deletionLog = new DeletionLogModel({
-      deletedDocumentId: documentId,
-      deletionTime: deletionTime,
-      expireAt: change.expireAt, // Store the original expireAt time in the deletion log
-      deletionTimeDiff: deletionTime - preImage.expireAt
-    });
+    const postImage = change.fullDocument;
+    const expireAt = postImage.expireAt
+    const deletionTimeDiff = expireAt-currentTime
+    console.log('ObjectId')
+    console.log(documentId)
 
-    await deletionLog.save();
+    console.log('Deletion Time Diff')
+    console.log(deletionTimeDiff)
+    console.log(`Deletion Time ${millisToMinutesAndSeconds(deletionTimeDiff)}`)
+    if(deletionTimeDiff <= 60*1000){
+      minuteBucket.push(documentId)
+    }else if(deletionTimeDiff > 60*1000 && deletionTimeDiff <= 120*1000){
+      twoMinuteBucket.push(documentId)
+    }else if(deletionTimeDiff > 120*1000){
+      restBucket.push(documentId)
+    }
+    console.log('------------------')
+    console.log('minute bucket')
+    console.log(minuteBucket)
+    console.log('------------------')
+    console.log('2 minute bucket')
+    console.log(twoMinuteBucket)
+    console.log('------------------')
+    console.log('rest bucket')
+    console.log(restBucket)
+
+
   }
 });
 
-
+function millisToMinutesAndSeconds(millis) {
+  var minutes = Math.floor(millis / 60000);
+  var seconds = ((millis % 60000) / 1000).toFixed(0);
+  return minutes + ":" + (seconds < 10 ? '0' : '') + seconds;
+}
 
 
 export async function generateExpiryDocuments(count) {
   let documents = [];
   const currDate = Date.now();
   for (let i = 0; i < count; i++) {
-    const expireAt = new Date(currDate + Math.floor(Math.random() * 600000) + 60000*2); // Random time within the next 10 minutes
+    const expireAt = new Date(currDate + Math.floor(Math.random() * 600000)); // Random time within the next 10 minutes
     const expiryDoc = new ExpiryModel({
       value: `Document ${i + 1}`,
       expireAt: expireAt
