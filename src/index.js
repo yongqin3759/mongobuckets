@@ -2,7 +2,9 @@ import { createServer } from 'http'
 import mongoose from 'mongoose'
 import { MONGODB_URI } from './utils/config.js'
 import logger from './utils/logger.js'
-import { ExpiryModel, DeletionLogModel, generateExpiryDocuments } from './models/expiry.model.js'
+import { minuteJob, fiveMinuteJob } from './utils/cron.js'
+import { ExpiryModel, DeletionLogModel, generateExpiryDocuments, NUMBER_OF_OBJECTS } from './models/expiry.model.js'
+
 
 
 async function main() {
@@ -30,9 +32,9 @@ async function main() {
       })
       .catch((error) => {
         console.error('Error deleting ExpiryModel collection:', error);
-      }).finally(() => {
+      }).finally(async () => {
         console.log('generateExpiryDocuments')
-        generateExpiryDocuments(10)
+        await generateExpiryDocuments(NUMBER_OF_OBJECTS)
       })
       ;
       
@@ -49,6 +51,13 @@ async function main() {
     console.info('Server is running on http://localhost:4000/')
   })
 
+
+  console.log('Before job instantiation');
+
+  minuteJob.start();
+  fiveMinuteJob.start()
+
+  console.log('After job instantiation');
 }
 
 main().catch(console.error)

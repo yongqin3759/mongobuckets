@@ -1,10 +1,13 @@
 import mongoose from 'mongoose'
+import {buckets} from '../entity/buckets.js';
+
+export const NUMBER_OF_OBJECTS = 1000000
+
 
 const expirySchema = new mongoose.Schema({
   value: { type: String, required: true },
   expireAt: {
-    type: Date,
-    default: Date.now() + 10 * 60 * 1000,   // expires in 10 minutes
+    type: Date
   },
   
 });
@@ -15,20 +18,14 @@ const deletionLogSchema = new mongoose.Schema({
   deletionTimeDiff: { type: Number }
 });
 
-const DeletionLogModel = mongoose.model('DeletionLog10', deletionLogSchema);
-const ExpiryModel = mongoose.model('Expiry', expirySchema);
+const DeletionLogModel = mongoose.model(`DeletionLog${NUMBER_OF_OBJECTS}`, deletionLogSchema);
+const ExpiryModel = mongoose.model(`Expiry`, expirySchema);
 
 const changeStream = ExpiryModel.watch([], { 
   fullDocument: "updateLookup", 
   fullDocumentBeforeChange: "required" 
 });
 
-
-const minuteBucket = []
-
-const twoMinuteBucket = []
-
-const restBucket = []
 
 
 changeStream.on('change', async (change) => {
@@ -51,28 +48,13 @@ changeStream.on('change', async (change) => {
     const postImage = change.fullDocument;
     const expireAt = postImage.expireAt
     const deletionTimeDiff = expireAt-currentTime
-    console.log('ObjectId')
-    console.log(documentId)
-
-    console.log('Deletion Time Diff')
-    console.log(deletionTimeDiff)
-    console.log(`Deletion Time ${millisToMinutesAndSeconds(deletionTimeDiff)}`)
     if(deletionTimeDiff <= 60*1000){
-      minuteBucket.push(documentId)
-    }else if(deletionTimeDiff > 60*1000 && deletionTimeDiff <= 120*1000){
-      twoMinuteBucket.push(documentId)
-    }else if(deletionTimeDiff > 120*1000){
-      restBucket.push(documentId)
+      buckets.addToMinuteBucket(documentId.toString())
+    }else if(deletionTimeDiff > 60*1000 && deletionTimeDiff <= 300000){
+      buckets.addToFiveMinuteBucket(documentId, expireAt)
+    }else if(deletionTimeDiff > 300000){
+      buckets.addToRestBucket(documentId, expireAt)
     }
-    console.log('------------------')
-    console.log('minute bucket')
-    console.log(minuteBucket)
-    console.log('------------------')
-    console.log('2 minute bucket')
-    console.log(twoMinuteBucket)
-    console.log('------------------')
-    console.log('rest bucket')
-    console.log(restBucket)
 
 
   }
@@ -89,7 +71,7 @@ export async function generateExpiryDocuments(count) {
   let documents = [];
   const currDate = Date.now();
   for (let i = 0; i < count; i++) {
-    const expireAt = new Date(currDate + Math.floor(Math.random() * 600000)); // Random time within the next 10 minutes
+    const expireAt = new Date(currDate + Math.floor(Math.random() * 600000)+600000); // Random time within the next 10 minutes
     const expiryDoc = new ExpiryModel({
       value: `Document ${i + 1}`,
       expireAt: expireAt
